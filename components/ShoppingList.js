@@ -1,15 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { addItem, editItem, deleteItem } from '../store/actions';
+import { addItem, editItem, deleteItem, setItems } from '../store/actions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ShoppingList = () => {
   const [newItem, setNewItem] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [loading, setLoading] = useState(true);
   
   const items = useSelector(state => state.items);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    const loadItems = async () => {
+      try {
+        const savedItems = await AsyncStorage.getItem('shoppingList');
+        if (savedItems !== null) {
+          dispatch(setItems(JSON.parse(savedItems)));
+        }
+      } catch (error) {
+        console.error('Error loading items:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadItems();
+  }, []);
 
   const handleAddItem = () => {
     if (newItem.trim()) {
@@ -35,6 +54,14 @@ const ShoppingList = () => {
   const handleDeleteItem = (id) => {
     dispatch(deleteItem(id));
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
@@ -102,6 +129,11 @@ const ShoppingList = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   container: {
     flex: 1,
     padding: 20,
