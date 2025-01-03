@@ -2,6 +2,7 @@ export const ADD_ITEM = 'ADD_ITEM';
 export const EDIT_ITEM = 'EDIT_ITEM';
 export const DELETE_ITEM = 'DELETE_ITEM';
 export const SET_ITEMS = 'SET_ITEMS';
+export const TOGGLE_PURCHASED = 'TOGGLE_PURCHASED';
 
 export const addItem = (item) => ({
   type: ADD_ITEM,
@@ -21,4 +22,9 @@ export const deleteItem = (id) => ({
 export const setItems = (items) => ({
   type: SET_ITEMS,
   payload: items
+});
+
+export const togglePurchased = (id) => ({
+  type: TOGGLE_PURCHASED,
+  payload: id
 });

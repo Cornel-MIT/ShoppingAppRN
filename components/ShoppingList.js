@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard
+} from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { addItem, editItem, deleteItem, setItems } from '../store/actions';
+import { addItem, editItem, deleteItem, setItems, togglePurchased } from '../store/actions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Checkbox from 'expo-checkbox';
 
 const ShoppingList = () => {
-  const [newItem, setNewItem] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editText, setEditText] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   
   const items = useSelector(state => state.items);
@@ -31,29 +44,118 @@ const ShoppingList = () => {
   }, []);
 
   const handleAddItem = () => {
-    if (newItem.trim()) {
-      dispatch(addItem({ name: newItem.trim() }));
-      setNewItem('');
+    if (newItemName.trim()) {
+      dispatch(addItem({
+        name: newItemName.trim(),
+        quantity: parseInt(newItemQuantity) || 1,
+      }));
+      setNewItemName('');
+      setNewItemQuantity('');
+      Keyboard.dismiss();
     }
   };
 
-  const handleEditItem = (id) => {
-    const item = items.find(item => item.id === id);
-    setEditingId(id);
-    setEditText(item.name);
+  const handleEditPress = (item) => {
+    setEditingItem({
+      ...item,
+      editName: item.name,
+      editQuantity: item.quantity.toString()
+    });
+    setModalVisible(true);
   };
 
-  const handleSaveEdit = (id) => {
-    if (editText.trim()) {
-      dispatch(editItem(id, { name: editText.trim() }));
-      setEditingId(null);
-      setEditText('');
+  const handleSaveEdit = () => {
+    if (editingItem.editName.trim()) {
+      dispatch(editItem(editingItem.id, {
+        name: editingItem.editName.trim(),
+        quantity: parseInt(editingItem.editQuantity) || 1,
+      }));
+      setModalVisible(false);
+      setEditingItem(null);
     }
   };
 
-  const handleDeleteItem = (id) => {
-    dispatch(deleteItem(id));
+  const handleTogglePurchased = (id) => {
+    dispatch(togglePurchased(id));
   };
+
+  const EditModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => setModalVisible(false)}
+    >
+      <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={e => e.stopPropagation()}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Item</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editingItem?.editName}
+                onChangeText={(text) => setEditingItem({...editingItem, editName: text})}
+                placeholder="Item name"
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={editingItem?.editQuantity}
+                onChangeText={(text) => setEditingItem({...editingItem, editQuantity: text})}
+                placeholder="Quantity"
+                keyboardType="numeric"
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleSaveEdit}
+                >
+                  <Text style={styles.buttonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+
+  const renderItem = ({ item }) => (
+    <View style={[styles.itemContainer, item.purchased && styles.purchasedItem]}>
+      <View style={styles.itemLeftSection}>
+        <Checkbox
+          value={item.purchased}
+          onValueChange={() => handleTogglePurchased(item.id)}
+          style={styles.checkbox}
+        />
+        <View style={styles.itemDetails}>
+          <Text style={[styles.itemText, item.purchased && styles.purchasedText]}>
+            {item.name}
+          </Text>
+          <Text style={styles.quantityText}>Quantity: {item.quantity}</Text>
+        </View>
+      </View>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => handleEditPress(item)}
+        >
+          <Text style={styles.buttonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => dispatch(deleteItem(item.id))}
+        >
+          <Text style={styles.buttonText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -63,54 +165,25 @@ const ShoppingList = () => {
     );
   }
 
-  const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      {editingId === item.id ? (
-        <View style={styles.editContainer}>
-          <TextInput
-            style={styles.editInput}
-            value={editText}
-            onChangeText={setEditText}
-          />
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={() => handleSaveEdit(item.id)}
-          >
-            <Text style={styles.buttonText}>Save</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.itemContent}>
-          <Text style={styles.itemText}>{item.name}</Text>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => handleEditItem(item.id)}
-            >
-              <Text style={styles.buttonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteItem(item.id)}
-            >
-              <Text style={styles.buttonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Shopping List</Text>
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={newItem}
-          onChangeText={setNewItem}
-          placeholder="Add new item"
-        />
+        <View style={styles.inputFields}>
+          <TextInput
+            style={[styles.input, styles.nameInput]}
+            value={newItemName}
+            onChangeText={setNewItemName}
+            placeholder="Item name"
+          />
+          <TextInput
+            style={[styles.input, styles.quantityInput]}
+            value={newItemQuantity}
+            onChangeText={setNewItemQuantity}
+            placeholder="Quantity"
+            keyboardType="numeric"
+          />
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddItem}
@@ -124,6 +197,7 @@ const ShoppingList = () => {
         keyExtractor={item => item.id.toString()}
         style={styles.list}
       />
+      <EditModal />
     </View>
   );
 };
@@ -147,17 +221,28 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    marginBottom: 20
+    marginBottom: 20,
+    alignItems: 'center'
+  },
+  inputFields: {
+    flex: 1,
+    flexDirection: 'row',
+    marginRight: 10
   },
   input: {
-    flex: 1,
     height: 40,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     paddingHorizontal: 10,
-    marginRight: 10,
     backgroundColor: '#fff'
+  },
+  nameInput: {
+    flex: 3,
+    marginRight: 10
+  },
+  quantityInput: {
+    flex: 1
   },
   addButton: {
     backgroundColor: '#4CAF50',
@@ -170,20 +255,41 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 5,
     marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1,
     elevation: 2
   },
-  itemContent: {
+  purchasedItem: {
+    backgroundColor: '#f8f8f8',
+    opacity: 0.8
+  },
+  itemLeftSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    flex: 1
+  },
+  checkbox: {
+    marginRight: 10
+  },
+  itemDetails: {
+    flex: 1
   },
   itemText: {
     fontSize: 16,
-    flex: 1
+    marginBottom: 4
+  },
+  purchasedText: {
+    textDecorationLine: 'line-through',
+    color: '#666'
+  },
+  quantityText: {
+    fontSize: 12,
+    color: '#666'
   },
   buttonContainer: {
     flexDirection: 'row'
@@ -203,23 +309,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold'
   },
-  editContainer: {
-    flexDirection: 'row'
-  },
-  editInput: {
+  modalOverlay: {
     flex: 1,
-    height: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%'
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center'
+  },
+  modalInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
-    paddingHorizontal: 10,
-    marginRight: 10
+    padding: 10,
+    marginBottom: 10
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10
+  },
+  modalButton: {
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
-    padding: 8,
-    borderRadius: 5,
-    justifyContent: 'center'
+    backgroundColor: '#4CAF50'
+  },
+  cancelButton: {
+    backgroundColor: '#f44336'
   },
   list: {
     flex: 1
